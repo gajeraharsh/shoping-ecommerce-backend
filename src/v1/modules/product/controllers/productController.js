@@ -113,7 +113,7 @@ const getProducts = async (req, res) => {
         orderBy = { name: 'desc' };
         break;
       case 'rating_desc':
-        orderBy = { rating: 'desc' };
+        orderBy = { createdAt: 'desc' };
         break;
       case 'newest':
         orderBy = { createdAt: 'desc' };
@@ -283,7 +283,7 @@ const getTrendingProducts = async (req, res) => {
       }
     },
     take: limit,
-    orderBy: { rating: 'desc' }
+    orderBy: { createdAt: 'desc' }
   });
 
   res.json({
@@ -342,7 +342,7 @@ const getProductRecommendations = async (req, res) => {
       }
     },
     take: limit,
-    orderBy: { rating: 'desc' }
+    orderBy: { createdAt: 'desc' }
   });
 
   res.json({
@@ -415,7 +415,7 @@ const searchProducts = async (req, res) => {
       },
       skip,
       take: limit,
-      orderBy: { rating: 'desc' }
+      orderBy: { createdAt: 'desc' }
     }),
     prisma.product.count({ where })
   ]);
@@ -897,7 +897,7 @@ const getProductsByCategory = async (req, res) => {
         orderBy.price = 'desc';
         break;
       case 'popular':
-        orderBy.rating = 'desc';
+        orderBy.createdAt = 'desc';
         break;
       case 'newest':
       default:
@@ -996,7 +996,7 @@ const getProductsByBrand = async (req, res) => {
         orderBy.price = 'desc';
         break;
       case 'popular':
-        orderBy.rating = 'desc';
+        orderBy.createdAt = 'desc';
         break;
       case 'newest':
       default:
