@@ -137,37 +137,131 @@ const createOrder = async (req, res) => {
  *         description: Orders retrieved successfully
  */
 const getUserOrders = async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      search, 
+      sortBy = 'newest',
+      startDate,
+      endDate,
+      minAmount,
+      maxAmount
+    } = req.query;
+    const skip = (page - 1) * limit;
+    const userId = req.user.id;
 
-  const [orders, total] = await Promise.all([
-    prisma.order.findMany({
-      where: { userId: req.user.id },
-      include: {
-        items: {
-          include: { product: { include: { images: { take: 1 } } } }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit
-    }),
-    prisma.order.count({ where: { userId: req.user.id } })
-  ]);
-
-  res.json({
-    success: true,
-    data: {
-      orders,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
+    // Build filter conditions
+    const where = { userId };
+    
+    if (status && status !== 'all') {
+      where.status = status;
     }
-  });
+
+    if (search) {
+      where.OR = [
+        { orderNumber: { contains: search, mode: 'insensitive' } },
+        { items: { some: { product: { name: { contains: search, mode: 'insensitive' } } } } }
+      ];
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) where.createdAt.lte = new Date(endDate);
+    }
+
+    if (minAmount || maxAmount) {
+      where.total = {};
+      if (minAmount) where.total.gte = parseFloat(minAmount);
+      if (maxAmount) where.total.lte = parseFloat(maxAmount);
+    }
+
+    // Build sort conditions
+    let orderBy = {};
+    switch (sortBy) {
+      case 'oldest':
+        orderBy.createdAt = 'asc';
+        break;
+      case 'amount-high':
+        orderBy.total = 'desc';
+        break;
+      case 'amount-low':
+        orderBy.total = 'asc';
+        break;
+      case 'newest':
+      default:
+        orderBy.createdAt = 'desc';
+        break;
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: {
+            include: { 
+              product: { 
+                include: { 
+                  images: { 
+                    take: 1,
+                    orderBy: { sortOrder: 'asc' }
+                  } 
+                } 
+              } 
+            }
+          },
+          address: true,
+          payment: true
+        },
+        orderBy,
+        skip: parseInt(skip),
+        take: parseInt(limit)
+      }),
+      prisma.order.count({ where })
+    ]);
+
+    // Get order statistics
+    const stats = await prisma.order.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: { status: true },
+      _sum: { total: true }
+    });
+
+    const orderStats = {
+      total: stats.reduce((sum, stat) => sum + stat._count.status, 0),
+      totalSpent: stats.reduce((sum, stat) => sum + (stat._sum.total || 0), 0),
+      byStatus: stats.reduce((acc, stat) => {
+        acc[stat.status] = {
+          count: stat._count.status,
+          total: stat._sum.total || 0
+        };
+        return acc;
+      }, {})
+    };
+
+    res.json({
+      success: true,
+      data: {
+        orders,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        },
+        stats: orderStats
+      }
+    });
+  } catch (error) {
+    console.error('Error getting user orders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get orders'
+    });
+  }
 };
 
 /**
@@ -189,32 +283,88 @@ const getUserOrders = async (req, res) => {
  *         description: Order retrieved successfully
  */
 const getOrderById = async (req, res) => {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
 
-  const order = await prisma.order.findFirst({
-    where: {
-      id,
-      userId: req.user.id
-    },
-    include: {
-      items: {
-        include: { product: { include: { images: { take: 1 } } } }
-      },
-      address: true
+    const order = await prisma.order.findFirst({
+      where: { id, userId },
+      include: {
+        items: {
+          include: { 
+            product: { 
+              include: { 
+                images: { 
+                  orderBy: { sortOrder: 'asc' }
+                } 
+              } 
+            } 
+          }
+        },
+        address: true,
+        payment: true,
+        returns: {
+          include: {
+            items: {
+              include: {
+                orderItem: {
+                  include: {
+                    product: {
+                      include: {
+                        images: { take: 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
     }
-  });
 
-  if (!order) {
-    return res.status(404).json({
+    // Generate detailed timeline
+    const timeline = generateDetailedOrderTimeline(order);
+
+    // Check if items can be returned/reviewed
+    const itemsWithActions = order.items.map(item => {
+      const canReturn = order.status === 'DELIVERED' && 
+        new Date() <= new Date(order.createdAt.getTime() + 14 * 24 * 60 * 60 * 1000);
+      
+      const canReview = order.status === 'DELIVERED';
+      
+      return {
+        ...item,
+        canReturn,
+        canReview,
+        eligibleUntil: canReturn ? new Date(order.createdAt.getTime() + 14 * 24 * 60 * 60 * 1000) : null
+      };
+    });
+
+    res.json({
+      success: true,
+      data: { 
+        order: {
+          ...order,
+          items: itemsWithActions
+        },
+        timeline
+      }
+    });
+  } catch (error) {
+    console.error('Error getting order by ID:', error);
+    res.status(500).json({
       success: false,
-      message: 'Order not found'
+      message: 'Failed to get order details'
     });
   }
-
-  res.json({
-    success: true,
-    data: { order }
-  });
 };
 
 /**
@@ -306,10 +456,466 @@ const updateOrderStatus = async (req, res) => {
   });
 };
 
+/**
+ * @swagger
+ * /api/v1/orders/{id}/track:
+ *   get:
+ *     summary: Track order status
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order tracking information retrieved successfully
+ */
+const trackOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const order = await prisma.order.findFirst({
+      where: { id, userId },
+      include: {
+        items: {
+          include: { 
+            product: { 
+              include: { 
+                images: { take: 1 } 
+              } 
+            } 
+          }
+        },
+        address: true,
+        payment: true
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Generate detailed tracking information
+    const trackingInfo = generateDetailedTrackingInfo(order);
+
+    res.json({
+      success: true,
+      data: { trackingInfo }
+    });
+  } catch (error) {
+    console.error('Error tracking order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get tracking information'
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /api/v1/orders/{id}/cancel:
+ *   post:
+ *     summary: Cancel order
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order cancelled successfully
+ */
+const cancelOrder = async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const order = await prisma.order.findFirst({
+    where: {
+      id,
+      userId: req.user.id,
+      status: { in: ['PENDING', 'CONFIRMED', 'PROCESSING'] }
+    },
+    include: { items: true }
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found or cannot be cancelled'
+    });
+  }
+
+  // Update order status
+  await prisma.order.update({
+    where: { id },
+    data: { 
+      status: 'CANCELLED',
+      notes: reason ? `Cancelled: ${reason}` : 'Cancelled by customer'
+    }
+  });
+
+  // Restore product stock
+  for (const item of order.items) {
+    await prisma.product.update({
+      where: { id: item.productId },
+      data: { stock: { increment: item.quantity } }
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Order cancelled successfully'
+  });
+};
+
+/**
+ * @swagger
+ * /api/v1/orders/{id}/return:
+ *   post:
+ *     summary: Request order return
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Return request submitted successfully
+ */
+const requestReturn = async (req, res) => {
+  const { id } = req.params;
+  const { reason, items } = req.body;
+
+  const order = await prisma.order.findFirst({
+    where: {
+      id,
+      userId: req.user.id,
+      status: 'DELIVERED'
+    }
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found or cannot be returned'
+    });
+  }
+
+  // Create return request (you might want to add a Return model)
+  // For now, we'll just update the order
+  await prisma.order.update({
+    where: { id },
+    data: { 
+      status: 'RETURN_REQUESTED',
+      notes: `Return requested: ${reason}`
+    }
+  });
+
+  res.json({
+    success: true,
+    message: 'Return request submitted successfully'
+  });
+};
+
+/**
+ * @swagger
+ * /api/v1/orders/{id}/invoice:
+ *   get:
+ *     summary: Download order invoice
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Invoice generated successfully
+ */
+const downloadInvoice = async (req, res) => {
+  const { id } = req.params;
+
+  const order = await prisma.order.findFirst({
+    where: {
+      id,
+      userId: req.user.id
+    },
+    include: {
+      items: {
+        include: { product: true }
+      },
+      address: true,
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true
+        }
+      }
+    }
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found'
+    });
+  }
+
+  // Generate invoice data (you might want to use a PDF library)
+  const invoiceData = {
+    invoiceNumber: `INV-${order.orderNumber}`,
+    orderNumber: order.orderNumber,
+    date: order.createdAt,
+    customer: {
+      name: `${order.user.firstName} ${order.user.lastName}`,
+      email: order.user.email,
+      address: order.address
+    },
+    items: order.items.map(item => ({
+      name: item.product.name,
+      quantity: item.quantity,
+      price: item.price,
+      total: item.total
+    })),
+    subtotal: order.subtotal,
+    taxAmount: order.taxAmount,
+    shippingFee: order.shippingFee,
+    discount: order.discount,
+    total: order.total
+  };
+
+  res.json({
+    success: true,
+    data: { invoice: invoiceData }
+  });
+};
+
+// Generate detailed order timeline
+const generateDetailedOrderTimeline = (order) => {
+  const timeline = [
+    {
+      status: 'ORDER_PLACED',
+      title: 'Order Placed',
+      description: 'Your order has been placed successfully',
+      date: order.createdAt,
+      completed: true,
+      icon: 'shopping-cart'
+    }
+  ];
+
+  // Add payment confirmation
+  if (order.paymentStatus === 'PAID') {
+    timeline.push({
+      status: 'PAYMENT_CONFIRMED',
+      title: 'Payment Confirmed',
+      description: 'Payment has been processed successfully',
+      date: new Date(order.createdAt.getTime() + 2 * 60 * 60 * 1000),
+      completed: true,
+      icon: 'credit-card'
+    });
+  }
+
+  // Add order confirmation
+  if (order.status !== 'PENDING') {
+    timeline.push({
+      status: 'ORDER_CONFIRMED',
+      title: 'Order Confirmed',
+      description: 'Your order has been confirmed',
+      date: new Date(order.createdAt.getTime() + 4 * 60 * 60 * 1000),
+      completed: true,
+      icon: 'check-circle'
+    });
+  }
+
+  // Add processing
+  if (['PROCESSING', 'SHIPPED', 'DELIVERED'].includes(order.status)) {
+    timeline.push({
+      status: 'PROCESSING',
+      title: 'Processing',
+      description: 'Your order is being processed',
+      date: new Date(order.createdAt.getTime() + 24 * 60 * 60 * 1000),
+      completed: true,
+      icon: 'package'
+    });
+  }
+
+  // Add shipped
+  if (['SHIPPED', 'DELIVERED'].includes(order.status)) {
+    timeline.push({
+      status: 'SHIPPED',
+      title: 'Shipped',
+      description: order.trackingNumber 
+        ? `Your order has been shipped. Tracking: ${order.trackingNumber}`
+        : 'Your order has been shipped',
+      date: new Date(order.createdAt.getTime() + 48 * 60 * 60 * 1000),
+      completed: true,
+      icon: 'truck'
+    });
+  }
+
+  // Add out for delivery
+  if (order.status === 'DELIVERED') {
+    timeline.push({
+      status: 'OUT_FOR_DELIVERY',
+      title: 'Out for Delivery',
+      description: 'Your order is out for delivery',
+      date: new Date(order.createdAt.getTime() + 72 * 60 * 60 * 1000),
+      completed: true,
+      icon: 'map-pin'
+    });
+  }
+
+  // Add delivered
+  if (order.status === 'DELIVERED') {
+    timeline.push({
+      status: 'DELIVERED',
+      title: 'Delivered',
+      description: 'Order delivered successfully',
+      date: order.estimatedDelivery || new Date(order.createdAt.getTime() + 96 * 60 * 60 * 1000),
+      completed: true,
+      icon: 'check-circle'
+    });
+  }
+
+  // Add cancelled if applicable
+  if (order.status === 'CANCELLED') {
+    timeline.push({
+      status: 'CANCELLED',
+      title: 'Cancelled',
+      description: 'Order has been cancelled',
+      date: order.updatedAt,
+      completed: true,
+      icon: 'x-circle'
+    });
+  }
+
+  return timeline;
+};
+
+// Generate detailed tracking information
+const generateDetailedTrackingInfo = (order) => {
+  const courierInfo = {
+    name: order.trackingNumber ? 'BlueDart' : 'Standard Delivery',
+    phone: '1800-123-4567',
+    email: 'support@courier.com',
+    website: 'https://courier.com'
+  };
+
+  const shipmentDetails = {
+    weight: `${order.items.length * 0.5} kg`,
+    dimensions: '30 x 25 x 5 cm',
+    value: order.total,
+    items: order.items.length
+  };
+
+  const deliveryAddress = {
+    name: `${order.address.firstName} ${order.address.lastName}`,
+    address: `${order.address.address1}${order.address.address2 ? ', ' + order.address.address2 : ''}`,
+    city: order.address.city,
+    state: order.address.state,
+    pincode: order.address.postalCode,
+    country: order.address.country,
+    phone: order.address.phone
+  };
+
+  const trackingTimeline = generateDetailedTrackingTimeline(order);
+
+  return {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    trackingNumber: order.trackingNumber || `TRK${Date.now()}`,
+    estimatedDelivery: order.estimatedDelivery,
+    courier: courierInfo,
+    shipmentDetails,
+    deliveryAddress,
+    timeline: trackingTimeline
+  };
+};
+
+// Generate detailed tracking timeline
+const generateDetailedTrackingTimeline = (order) => {
+  const timeline = [
+    {
+      status: 'ORDER_PICKED_UP',
+      title: 'Order Picked Up',
+      location: 'Warehouse',
+      date: new Date(order.createdAt.getTime() + 24 * 60 * 60 * 1000),
+      description: 'Package picked up from seller',
+      completed: ['PROCESSING', 'SHIPPED', 'DELIVERED'].includes(order.status)
+    },
+    {
+      status: 'IN_TRANSIT',
+      title: 'In Transit',
+      location: 'Sorting Facility',
+      date: new Date(order.createdAt.getTime() + 36 * 60 * 60 * 1000),
+      description: 'Package processed at sorting facility',
+      completed: ['SHIPPED', 'DELIVERED'].includes(order.status)
+    },
+    {
+      status: 'IN_TRANSIT',
+      title: 'In Transit',
+      location: 'Hub',
+      date: new Date(order.createdAt.getTime() + 48 * 60 * 60 * 1000),
+      description: 'Package departed from origin hub',
+      completed: ['SHIPPED', 'DELIVERED'].includes(order.status)
+    },
+    {
+      status: 'IN_TRANSIT',
+      title: 'In Transit',
+      location: 'Destination Facility',
+      date: new Date(order.createdAt.getTime() + 60 * 60 * 60 * 1000),
+      description: 'Package arrived at destination facility',
+      completed: ['SHIPPED', 'DELIVERED'].includes(order.status)
+    },
+    {
+      status: 'OUT_FOR_DELIVERY',
+      title: 'Out for Delivery',
+      location: 'Local Office',
+      date: new Date(order.createdAt.getTime() + 72 * 60 * 60 * 1000),
+      description: 'Package is out for delivery',
+      completed: order.status === 'DELIVERED'
+    },
+    {
+      status: 'DELIVERED',
+      title: 'Delivered',
+      location: 'Customer Address',
+      date: order.estimatedDelivery || new Date(order.createdAt.getTime() + 96 * 60 * 60 * 1000),
+      description: 'Package delivered successfully',
+      completed: order.status === 'DELIVERED'
+    }
+  ];
+
+  return timeline;
+};
+
 module.exports = {
   createOrder,
   getUserOrders,
   getOrderById,
   getAllOrders,
-  updateOrderStatus
+  updateOrderStatus,
+  trackOrder,
+  cancelOrder,
+  requestReturn,
+  downloadInvoice
 };

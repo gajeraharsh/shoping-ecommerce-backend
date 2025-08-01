@@ -1,21 +1,21 @@
 const prisma = require('../../../../config/database');
 const { generateUniqueSlug } = require('../../../../utils/slugify');
-const { createCategorySchema, updateCategorySchema } = require('../../../../validations/product');
+const { createBrandSchema, updateBrandSchema } = require('../../../../validations/product');
 
 /**
  * @swagger
- * /api/v1/categories:
+ * /api/v1/brands:
  *   get:
- *     summary: Get all categories
- *     tags: [Categories]
+ *     summary: Get all brands
+ *     tags: [Brands]
  *     responses:
  *       200:
- *         description: Categories retrieved successfully
+ *         description: Brands retrieved successfully
  */
-const getCategories = async (req, res) => {
-  const categories = await prisma.category.findMany({
+const getBrands = async (req, res) => {
+  const brands = await prisma.brand.findMany({
     where: { isActive: true },
-    orderBy: { sortOrder: 'asc' },
+    orderBy: { name: 'asc' },
     include: {
       _count: {
         select: { products: { where: { isActive: true } } }
@@ -25,16 +25,16 @@ const getCategories = async (req, res) => {
 
   res.json({
     success: true,
-    data: { categories }
+    data: { brands }
   });
 };
 
 /**
  * @swagger
- * /api/v1/categories/{slug}:
+ * /api/v1/brands/{slug}:
  *   get:
- *     summary: Get category by slug
- *     tags: [Categories]
+ *     summary: Get brand by slug
+ *     tags: [Brands]
  *     parameters:
  *       - in: path
  *         name: slug
@@ -43,14 +43,14 @@ const getCategories = async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Category retrieved successfully
+ *         description: Brand retrieved successfully
  *       404:
- *         description: Category not found
+ *         description: Brand not found
  */
-const getCategoryBySlug = async (req, res) => {
+const getBrandBySlug = async (req, res) => {
   const { slug } = req.params;
 
-  const category = await prisma.category.findUnique({
+  const brand = await prisma.brand.findUnique({
     where: { slug, isActive: true },
     include: {
       _count: {
@@ -59,25 +59,25 @@ const getCategoryBySlug = async (req, res) => {
     }
   });
 
-  if (!category) {
+  if (!brand) {
     return res.status(404).json({
       success: false,
-      message: 'Category not found'
+      message: 'Brand not found'
     });
   }
 
   res.json({
     success: true,
-    data: { category }
+    data: { brand }
   });
 };
 
 /**
  * @swagger
- * /api/v1/categories/{slug}/products:
+ * /api/v1/brands/{slug}/products:
  *   get:
- *     summary: Get products by category
- *     tags: [Categories]
+ *     summary: Get products by brand
+ *     tags: [Brands]
  *     parameters:
  *       - in: path
  *         name: slug
@@ -103,22 +103,22 @@ const getCategoryBySlug = async (req, res) => {
  *       200:
  *         description: Products retrieved successfully
  */
-const getProductsByCategory = async (req, res) => {
+const getProductsByBrand = async (req, res) => {
   const { slug } = req.params;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
   const { sortBy } = req.query;
 
-  // Check if category exists
-  const category = await prisma.category.findUnique({
+  // Check if brand exists
+  const brand = await prisma.brand.findUnique({
     where: { slug, isActive: true }
   });
 
-  if (!category) {
+  if (!brand) {
     return res.status(404).json({
       success: false,
-      message: 'Category not found'
+      message: 'Brand not found'
     });
   }
 
@@ -150,7 +150,7 @@ const getProductsByCategory = async (req, res) => {
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where: {
-        categoryId: category.id,
+        brandId: brand.id,
         isActive: true
       },
       include: {
@@ -169,7 +169,7 @@ const getProductsByCategory = async (req, res) => {
     }),
     prisma.product.count({
       where: {
-        categoryId: category.id,
+        brandId: brand.id,
         isActive: true
       }
     })
@@ -180,7 +180,7 @@ const getProductsByCategory = async (req, res) => {
   res.json({
     success: true,
     data: {
-      category,
+      brand,
       products,
       pagination: {
         page,
@@ -196,22 +196,22 @@ const getProductsByCategory = async (req, res) => {
 
 /**
  * @swagger
- * /api/v1/categories:
+ * /api/v1/brands:
  *   post:
- *     summary: Create new category (Admin only)
- *     tags: [Categories]
+ *     summary: Create new brand (Admin only)
+ *     tags: [Brands]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       201:
- *         description: Category created successfully
+ *         description: Brand created successfully
  */
-const createCategory = async (req, res) => {
-  const validatedData = createCategorySchema.parse(req.body);
+const createBrand = async (req, res) => {
+  const validatedData = createBrandSchema.parse(req.body);
 
-  const slug = await generateUniqueSlug(validatedData.name, prisma.category);
+  const slug = await generateUniqueSlug(validatedData.name, prisma.brand);
 
-  const category = await prisma.category.create({
+  const brand = await prisma.brand.create({
     data: {
       ...validatedData,
       slug
@@ -220,17 +220,17 @@ const createCategory = async (req, res) => {
 
   res.status(201).json({
     success: true,
-    message: 'Category created successfully',
-    data: { category }
+    message: 'Brand created successfully',
+    data: { brand }
   });
 };
 
 /**
  * @swagger
- * /api/v1/categories/{id}:
+ * /api/v1/brands/{id}:
  *   put:
- *     summary: Update category (Admin only)
- *     tags: [Categories]
+ *     summary: Update brand (Admin only)
+ *     tags: [Brands]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -241,36 +241,36 @@ const createCategory = async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Category updated successfully
+ *         description: Brand updated successfully
  */
-const updateCategory = async (req, res) => {
+const updateBrand = async (req, res) => {
   const { id } = req.params;
-  const validatedData = updateCategorySchema.parse(req.body);
+  const validatedData = updateBrandSchema.parse(req.body);
 
   // If name is being updated, generate new slug
   let updateData = { ...validatedData };
   if (validatedData.name) {
-    updateData.slug = await generateUniqueSlug(validatedData.name, prisma.category);
+    updateData.slug = await generateUniqueSlug(validatedData.name, prisma.brand);
   }
 
-  const category = await prisma.category.update({
+  const brand = await prisma.brand.update({
     where: { id },
     data: updateData
   });
 
   res.json({
     success: true,
-    message: 'Category updated successfully',
-    data: { category }
+    message: 'Brand updated successfully',
+    data: { brand }
   });
 };
 
 /**
  * @swagger
- * /api/v1/categories/{id}:
+ * /api/v1/brands/{id}:
  *   delete:
- *     summary: Delete category (Admin only)
- *     tags: [Categories]
+ *     summary: Delete brand (Admin only)
+ *     tags: [Brands]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -281,27 +281,27 @@ const updateCategory = async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Category deleted successfully
+ *         description: Brand deleted successfully
  */
-const deleteCategory = async (req, res) => {
+const deleteBrand = async (req, res) => {
   const { id } = req.params;
 
-  await prisma.category.update({
+  await prisma.brand.update({
     where: { id },
     data: { isActive: false }
   });
 
   res.json({
     success: true,
-    message: 'Category deleted successfully'
+    message: 'Brand deleted successfully'
   });
 };
 
 module.exports = {
-  getCategories,
-  getCategoryBySlug,
-  getProductsByCategory,
-  createCategory,
-  updateCategory,
-  deleteCategory
-};
+  getBrands,
+  getBrandBySlug,
+  getProductsByBrand,
+  createBrand,
+  updateBrand,
+  deleteBrand
+}; 

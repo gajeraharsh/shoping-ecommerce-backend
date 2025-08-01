@@ -1,235 +1,405 @@
-const prisma = require('../../../../config/database');
-const { updateProfileSchema } = require('../../../../validations/auth');
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+const prisma = new PrismaClient();
 
-/**
- * @swagger
- * /api/v1/users/profile:
- *   put:
- *     summary: Update user profile
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               firstName:
- *                 type: string
- *               lastName:
- *                 type: string
- *               phone:
- *                 type: string
- *     responses:
- *       200:
- *         description: Profile updated successfully
- */
-const updateProfile = async (req, res) => {
-  const validatedData = updateProfileSchema.parse(req.body);
+// Get user profile
+const getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatar: true,
+        role: true,
+        isActive: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
 
-  const user = await prisma.user.update({
-    where: { id: req.user.id },
-    data: validatedData,
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      phone: true,
-      role: true,
-      updatedAt: true
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
     }
-  });
 
-  res.json({
-    success: true,
-    message: 'Profile updated successfully',
-    data: { user }
-  });
-};
-
-/**
- * @swagger
- * /api/v1/users/addresses:
- *   get:
- *     summary: Get user addresses
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Addresses retrieved successfully
- */
-const getAddresses = async (req, res) => {
-  const addresses = await prisma.address.findMany({
-    where: { userId: req.user.id },
-    orderBy: { isDefault: 'desc' }
-  });
-
-  res.json({
-    success: true,
-    data: { addresses }
-  });
-};
-
-/**
- * @swagger
- * /api/v1/users/addresses:
- *   post:
- *     summary: Add new address
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       201:
- *         description: Address added successfully
- */
-const addAddress = async (req, res) => {
-  const { isDefault, ...addressData } = req.body;
-
-  // If this is set as default, update other addresses
-  if (isDefault) {
-    await prisma.address.updateMany({
-      where: { userId: req.user.id },
-      data: { isDefault: false }
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user profile'
     });
   }
-
-  const address = await prisma.address.create({
-    data: {
-      ...addressData,
-      userId: req.user.id,
-      isDefault: isDefault || false
-    }
-  });
-
-  res.status(201).json({
-    success: true,
-    message: 'Address added successfully',
-    data: { address }
-  });
 };
 
-/**
- * @swagger
- * /api/v1/users/wishlist:
- *   get:
- *     summary: Get user wishlist
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Wishlist retrieved successfully
- */
-const getWishlist = async (req, res) => {
-  const wishlist = await prisma.wishlist.findMany({
-    where: { userId: req.user.id },
-    include: {
-      product: {
+// Update user profile
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { firstName, lastName, phone, avatar } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName,
+        lastName,
+        phone,
+        avatar
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        avatar: true,
+        role: true,
+        isActive: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    res.json({
+      success: true,
+      data: updatedUser,
+      message: 'Profile updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user profile'
+    });
+  }
+};
+
+// Change password
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    // Get current user with password
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword }
+    });
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to change password'
+    });
+  }
+};
+
+// Get user dashboard stats
+const getDashboardStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [
+      totalOrders,
+      totalSpent,
+      wishlistCount,
+      cartItemsCount,
+      recentOrders,
+      loyaltyPoints
+    ] = await Promise.all([
+      // Total orders
+      prisma.order.count({
+        where: { userId }
+      }),
+      
+      // Total amount spent
+      prisma.order.aggregate({
+        where: { 
+          userId,
+          status: { in: ['DELIVERED', 'SHIPPED'] }
+        },
+        _sum: { total: true }
+      }),
+      
+      // Wishlist count
+      prisma.wishlist.count({
+        where: { userId }
+      }),
+      
+      // Cart items count
+      prisma.cart.count({
+        where: { userId }
+      }),
+      
+      // Recent orders (last 5)
+      prisma.order.findMany({
+        where: { userId },
         include: {
-          images: {
-            take: 1,
-            orderBy: { sortOrder: 'asc' }
-          },
-          category: true,
-          brand: true
-        }
-      }
-    }
-  });
+          items: {
+            include: {
+              product: {
+                include: {
+                  images: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      }),
+      
+      // Loyalty points (mock calculation)
+      prisma.order.aggregate({
+        where: { 
+          userId,
+          status: { in: ['DELIVERED', 'SHIPPED'] }
+        },
+        _sum: { total: true }
+      })
+    ]);
 
-  res.json({
-    success: true,
-    data: { wishlist }
-  });
+    // Calculate loyalty points (1 point per ₹100 spent)
+    const points = Math.floor((totalSpent._sum.total || 0) / 100);
+
+    res.json({
+      success: true,
+      data: {
+        totalOrders,
+        totalSpent: totalSpent._sum.total || 0,
+        wishlistCount,
+        cartItemsCount,
+        loyaltyPoints: points,
+        recentOrders
+      }
+    });
+  } catch (error) {
+    console.error('Error getting dashboard stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get dashboard stats'
+    });
+  }
 };
 
-/**
- * @swagger
- * /api/v1/users/wishlist/{productId}:
- *   post:
- *     summary: Add product to wishlist
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: productId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       201:
- *         description: Product added to wishlist
- */
-const addToWishlist = async (req, res) => {
-  const { productId } = req.params;
+// Get user activity
+const getUserActivity = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { limit = 10, page = 1 } = req.query;
+    const skip = (page - 1) * limit;
 
-  const wishlistItem = await prisma.wishlist.upsert({
-    where: {
-      userId_productId: {
-        userId: req.user.id,
-        productId
-      }
-    },
-    update: {},
-    create: {
-      userId: req.user.id,
-      productId
-    }
-  });
+    const activities = await prisma.$queryRaw`
+      SELECT 
+        'order' as type,
+        o.id,
+        o.orderNumber,
+        o.status,
+        o.createdAt as date,
+        o.total as amount,
+        'Order placed' as title,
+        CONCAT(o.orderNumber, ' - ', o.status) as description
+      FROM orders o
+      WHERE o.userId = ${userId}
+      
+      UNION ALL
+      
+      SELECT 
+        'wishlist' as type,
+        w.id,
+        NULL as orderNumber,
+        NULL as status,
+        w.createdAt as date,
+        NULL as amount,
+        'Added to wishlist' as title,
+        p.name as description
+      FROM wishlist w
+      JOIN products p ON w.productId = p.id
+      WHERE w.userId = ${userId}
+      
+      UNION ALL
+      
+      SELECT 
+        'review' as type,
+        r.id,
+        NULL as orderNumber,
+        NULL as status,
+        r.createdAt as date,
+        NULL as amount,
+        'Product review' as title,
+        CONCAT(p.name, ' - ', r.rating, ' stars') as description
+      FROM reviews r
+      JOIN products p ON r.productId = p.id
+      WHERE r.userId = ${userId}
+      
+      ORDER BY date DESC
+      LIMIT ${parseInt(limit)}
+      OFFSET ${parseInt(skip)}
+    `;
 
-  res.status(201).json({
-    success: true,
-    message: 'Product added to wishlist',
-    data: { wishlistItem }
-  });
+    res.json({
+      success: true,
+      data: activities
+    });
+  } catch (error) {
+    console.error('Error getting user activity:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user activity'
+    });
+  }
 };
 
-/**
- * @swagger
- * /api/v1/users/wishlist/{productId}:
- *   delete:
- *     summary: Remove product from wishlist
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: productId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Product removed from wishlist
- */
-const removeFromWishlist = async (req, res) => {
-  const { productId } = req.params;
+// Get user preferences
+const getUserPreferences = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
-  await prisma.wishlist.delete({
-    where: {
-      userId_productId: {
-        userId: req.user.id,
-        productId
+    // Get user's favorite categories based on order history
+    const favoriteCategories = await prisma.$queryRaw`
+      SELECT 
+        c.id,
+        c.name,
+        c.slug,
+        c.image,
+        COUNT(oi.id) as orderCount
+      FROM categories c
+      JOIN products p ON c.id = p.categoryId
+      JOIN order_items oi ON p.id = oi.productId
+      JOIN orders o ON oi.orderId = o.id
+      WHERE o.userId = ${userId}
+      GROUP BY c.id, c.name, c.slug, c.image
+      ORDER BY orderCount DESC
+      LIMIT 5
+    `;
+
+    // Get user's favorite brands based on order history
+    const favoriteBrands = await prisma.$queryRaw`
+      SELECT 
+        b.id,
+        b.name,
+        b.slug,
+        b.logo,
+        COUNT(oi.id) as orderCount
+      FROM brands b
+      JOIN products p ON b.id = p.brandId
+      JOIN order_items oi ON p.id = oi.productId
+      JOIN orders o ON oi.orderId = o.id
+      WHERE o.userId = ${userId}
+      GROUP BY b.id, b.name, b.slug, b.logo
+      ORDER BY orderCount DESC
+      LIMIT 5
+    `;
+
+    res.json({
+      success: true,
+      data: {
+        favoriteCategories,
+        favoriteBrands
       }
-    }
-  });
+    });
+  } catch (error) {
+    console.error('Error getting user preferences:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user preferences'
+    });
+  }
+};
 
-  res.json({
-    success: true,
-    message: 'Product removed from wishlist'
-  });
+// Delete user account
+const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { password } = req.body;
+
+    // Get user with password
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is incorrect'
+      });
+    }
+
+    // Delete user (this will cascade delete related data due to Prisma relations)
+    await prisma.user.delete({
+      where: { id: userId }
+    });
+
+    res.json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete account'
+    });
+  }
 };
 
 module.exports = {
+  getProfile,
   updateProfile,
-  getAddresses,
-  addAddress,
-  getWishlist,
-  addToWishlist,
-  removeFromWishlist
+  changePassword,
+  getDashboardStats,
+  getUserActivity,
+  getUserPreferences,
+  deleteAccount
 };

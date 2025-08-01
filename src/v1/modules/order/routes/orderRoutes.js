@@ -4,7 +4,11 @@ const {
   getUserOrders,
   getOrderById,
   getAllOrders,
-  updateOrderStatus
+  updateOrderStatus,
+  trackOrder,
+  cancelOrder,
+  requestReturn,
+  downloadInvoice
 } = require('../controllers/orderController');
 const { authenticate, adminOnly } = require('../../../../middlewares/auth');
 
@@ -17,5 +21,9 @@ router.get('/', getUserOrders);
 router.get('/admin', adminOnly, getAllOrders);
 router.get('/:id', getOrderById);
 router.put('/:id/status', adminOnly, updateOrderStatus);
+router.get('/:id/track', trackOrder);
+router.post('/:id/cancel', cancelOrder);
+router.post('/:id/return', requestReturn);
+router.get('/:id/invoice', downloadInvoice);
 
 module.exports = router;
