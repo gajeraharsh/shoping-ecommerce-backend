@@ -457,34 +457,54 @@ const searchProducts = async (req, res) => {
  *         description: Product not found
  */
 const getProductBySlug = async (req, res) => {
-  const { slug } = req.params;
+  try {
+    const { slug } = req.params;
 
-  const product = await prisma.product.findUnique({
-    where: { slug, isActive: true },
-    include: {
-      category: true,
-      brand: true,
-      images: { orderBy: { sortOrder: 'asc' } },
-      variants: true,
-      reviews: {
-        where: { isApproved: true },
-        include: { user: { select: { firstName: true, lastName: true } } },
-        orderBy: { createdAt: 'desc' }
+    // Check if the parameter is an ID (contains only alphanumeric characters and is longer than 20 chars)
+    // or a slug (contains hyphens and is shorter)
+    const isId = slug.length > 20 && /^[a-zA-Z0-9]+$/.test(slug);
+    
+    // Build the where condition based on whether it's an ID or slug
+    const whereCondition = isId 
+      ? { id: slug, isActive: true }
+      : { slug: slug, isActive: true };
+
+    const product = await prisma.product.findUnique({
+      where: whereCondition,
+      include: {
+        category: true,
+        brand: true,
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: true,
+        reviews: {
+          where: { isActive: true },
+          include: { user: { select: { firstName: true, lastName: true } } },
+          orderBy: { createdAt: 'desc' }
+        },
+        _count: {
+          select: { reviews: true }
+        }
       }
-    }
-  });
+    });
 
-  if (!product) {
-    return res.status(404).json({
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { product }
+    });
+  } catch (error) {
+    console.error('Error fetching product by slug:', error);
+    res.status(500).json({
       success: false,
-      message: 'Product not found'
+      message: 'Failed to fetch product'
     });
   }
-
-  res.json({
-    success: true,
-    data: { product }
-  });
 };
 
 /**
