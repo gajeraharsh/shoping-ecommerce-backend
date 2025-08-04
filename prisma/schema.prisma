@@ -92,6 +92,7 @@ model User {
   recentlyViewed RecentlyViewed[]
   payments  Payment[]
   refunds   Refund[]
+  auditLogs AuditLog[]
 }
 
 model Address {
@@ -506,4 +507,68 @@ model RecentlyViewed {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
+}
+
+model FAQ {
+  id          String   @id @default(cuid())
+  question    String
+  answer      String
+  category    String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Newsletter {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  isActive    Boolean  @default(true)
+  subscribedAt DateTime @default(now())
+  unsubscribedAt DateTime?
+  source      String?  // website, popup, checkout, etc.
+}
+
+model SEOPage {
+  id              String   @id @default(cuid())
+  pageName        String   @unique // home, products, categories, etc.
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  ogTitle         String?
+  ogDescription   String?
+  ogImage         String?
+  canonicalUrl    String?
+  robots          String?  // index,follow or noindex,nofollow
+  structuredData  Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, etc.
+  resource    String   // User, Product, Order, etc.
+  resourceId  String?
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model InstagramPost {
+  id          String   @id @default(cuid())
+  postId      String   @unique
+  imageUrl    String
+  caption     String?
+  permalink   String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
