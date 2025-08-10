@@ -10,7 +10,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const { swaggerUi, specs } = require('./config/swagger');
+const { swaggerUi, specs, serve, setup } = require('./config/swagger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 const { logger } = require('./utils/logger');
 
@@ -69,11 +69,7 @@ app.get('/health', (req, res) => {
 });
 
 // API Documentation
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
-  explorer: true,
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'E-commerce API Documentation'
-}));
+app.use('/docs', serve, setup);
 
 // API Routes
 app.use('/auth', authRoutes);

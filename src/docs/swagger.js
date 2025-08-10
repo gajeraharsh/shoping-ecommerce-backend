@@ -20,7 +20,7 @@ const options = {
     },
     servers: [
       {
-        url: process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
+        url: process.env.BASE_URL || 'http://localhost:3000',
         description: 'Development server'
       },
       {
