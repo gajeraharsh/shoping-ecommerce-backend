@@ -42,7 +42,7 @@ describe('Basic Auth Module', () => {
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('user');
-      expect(response.body.data).toHaveProperty('token');
+      expect(response.body.data).toHaveProperty('accessToken');
     });
 
     it('should fail with duplicate email', async () => {
@@ -97,7 +97,7 @@ describe('Basic Auth Module', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('user');
-      expect(response.body.data).toHaveProperty('token');
+      expect(response.body.data).toHaveProperty('accessToken');
     });
 
     it('should fail with invalid credentials', async () => {

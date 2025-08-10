@@ -16,9 +16,16 @@ const { uploadToS3 } = require('../../utils/upload');
 const createProduct = async (productData, files = []) => {
   const { categoryId, ...data } = productData;
 
+  // Validate categoryId parameter
+  if (!categoryId || isNaN(Number(categoryId))) {
+    throw new Error('Valid category ID is required');
+  }
+
+  const validCategoryId = Number(categoryId);
+
   // Verify category exists and is not deleted
   const category = await prisma.category.findFirst({
-    where: { id: Number(categoryId), ...notDeletedWhere() }
+    where: { id: validCategoryId, ...notDeletedWhere() }
   });
   
   if (!category) {
@@ -39,7 +46,7 @@ const createProduct = async (productData, files = []) => {
     const product = await tx.product.create({
       data: {
         ...data,
-        categoryId: Number(categoryId),
+        categoryId: validCategoryId,
         price: parseFloat(data.price),
         discountedPrice: data.discountedPrice ? parseFloat(data.discountedPrice) : null,
         stock: parseInt(data.stock) || 0
@@ -158,6 +165,11 @@ const getProducts = async (query) => {
  * @returns {Object|null} Product or null
  */
 const getProductById = async (id) => {
+  // Validate id parameter
+  if (!id || isNaN(Number(id))) {
+    throw new Error('Invalid product ID');
+  }
+
   return await prisma.product.findFirst({
     where: { id: Number(id), ...notDeletedWhere() },
     include: {
@@ -191,9 +203,16 @@ const getProductById = async (id) => {
 const updateProduct = async (id, updateData, files = []) => {
   const { categoryId, ...data } = updateData;
 
+  // Validate id parameter
+  if (!id || isNaN(Number(id))) {
+    throw new Error('Invalid product ID');
+  }
+
+  const productId = Number(id);
+
   // Verify product exists
   const existingProduct = await prisma.product.findFirst({
-    where: { id: Number(id), ...notDeletedWhere() }
+    where: { id: productId, ...notDeletedWhere() }
   });
 
   if (!existingProduct) {
@@ -229,19 +248,19 @@ const updateProduct = async (id, updateData, files = []) => {
     if (data.stock !== undefined) updatePayload.stock = parseInt(data.stock);
 
     const product = await tx.product.update({
-      where: { id: Number(id) },
+      where: { id: productId },
       data: updatePayload
     });
 
     // Add new images if provided
     if (imageUrls.length > 0) {
       const existingImagesCount = await tx.productImage.count({
-        where: { productId: Number(id), ...notDeletedWhere() }
+        where: { productId: productId, ...notDeletedWhere() }
       });
 
       await tx.productImage.createMany({
         data: imageUrls.map((url, index) => ({
-          productId: Number(id),
+          productId: productId,
           url,
           position: existingImagesCount + index + 1
         }))
@@ -249,7 +268,7 @@ const updateProduct = async (id, updateData, files = []) => {
     }
 
     return await tx.product.findUnique({
-      where: { id: Number(id) },
+      where: { id: productId },
       include: {
         category: true,
         ProductImage: true,
@@ -264,6 +283,11 @@ const updateProduct = async (id, updateData, files = []) => {
  * @param {string} id - Product ID
  */
 const deleteProduct = async (id) => {
+  // Validate id parameter
+  if (!id || isNaN(Number(id))) {
+    throw new Error('Invalid product ID');
+  }
+
   const product = await prisma.product.findFirst({
     where: { id: Number(id), ...notDeletedWhere() }
   });

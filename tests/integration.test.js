@@ -60,7 +60,7 @@ describe('Integration Tests', () => {
       .post('/api/auth/register')
       .send(userData);
 
-    userToken = userResponse.body.data.token;
+    userToken = userResponse.body.data.accessToken;
     testUserId = userResponse.body.data.user.id;
 
     // Create admin user
@@ -77,7 +77,7 @@ describe('Integration Tests', () => {
       .post('/api/auth/register')
       .send(adminData);
 
-    adminToken = adminResponse.body.data.token;
+    adminToken = adminResponse.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -284,7 +284,7 @@ describe('Integration Tests', () => {
       expect(registerResponse.body.success).toBe(true);
       expect(registerResponse.body.data).toHaveProperty('token');
 
-      const newUserToken = registerResponse.body.data.token;
+      const newUserToken = registerResponse.body.data.accessToken;
 
       // 2. Login with credentials
       const loginResponse = await request(app)

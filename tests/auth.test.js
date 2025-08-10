@@ -48,7 +48,7 @@ describe('Auth Module', () => {
       expect(response.body.data.user.email).toBe(userData.email);
 
       testUser = response.body.data.user;
-      authToken = response.body.data.token;
+      authToken = response.body.data.accessToken;
     });
 
     it('should fail with invalid email format', async () => {
@@ -66,7 +66,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Validation failed');
+      expect(response.body.message).toContain('Email must be a valid email address');
     });
 
     it('should fail with weak password', async () => {
@@ -84,7 +84,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Validation failed');
+      expect(response.body.message).toContain('Password must be at least 8 characters long');
     });
 
     it('should fail with duplicate email', async () => {
@@ -118,7 +118,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Validation failed');
+      expect(response.body.message).toContain('First name, last name, email, and password are required');
     });
   });
 
@@ -153,7 +153,7 @@ describe('Auth Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Invalid credentials');
+      expect(response.body.message).toContain('Invalid email or password');
     });
 
     it('should fail with invalid password', async () => {
@@ -168,7 +168,7 @@ describe('Auth Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Invalid credentials');
+      expect(response.body.message).toContain('Invalid email or password');
     });
 
     it('should fail with missing credentials', async () => {
@@ -178,7 +178,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Validation failed');
+      expect(response.body.message).toContain('Email and password are required');
     });
   });
 
@@ -190,7 +190,7 @@ describe('Auth Module', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('reset email sent');
+      expect(response.body.message).toContain('Password reset email sent');
     });
 
     it('should handle non-existent email gracefully', async () => {
@@ -200,7 +200,7 @@ describe('Auth Module', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('reset email sent');
+      expect(response.body.message).toContain('Password reset email sent');
     });
 
     it('should fail with invalid email format', async () => {
@@ -210,7 +210,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Validation failed');
+      expect(response.body.message).toContain('Email must be a valid email address');
     });
   });
 
@@ -225,7 +225,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Invalid or expired token');
+      expect(response.body.message).toContain('Invalid password reset token');
     });
 
     it('should fail with weak password', async () => {
@@ -238,7 +238,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Validation failed');
+      expect(response.body.message).toContain('Password must be at least 8 characters long');
     });
   });
 
@@ -281,7 +281,7 @@ describe('Auth Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Access token required');
+      expect(response.body.message).toContain('Unauthorized access');
     });
   });
 
@@ -293,7 +293,7 @@ describe('Auth Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Invalid or expired token');
+      expect(response.body.message).toContain('Invalid reset token');
     });
   });
 
@@ -314,7 +314,7 @@ describe('Auth Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Access token required');
+      expect(response.body.message).toContain('Unauthorized access');
     });
   });
 
@@ -335,7 +335,7 @@ describe('Auth Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Access token required');
+      expect(response.body.message).toContain('Unauthorized access');
     });
   });
 });

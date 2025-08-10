@@ -35,7 +35,7 @@ describe('Wishlist Module', () => {
       .post('/api/auth/register')
       .send(userData);
 
-    authToken = userResponse.body.data.token;
+    authToken = userResponse.body.data.accessToken;
     testUserId = userResponse.body.data.user.id;
 
     // Create admin for setup
@@ -52,7 +52,7 @@ describe('Wishlist Module', () => {
       .post('/api/auth/register')
       .send(adminData);
 
-    const adminToken = adminResponse.body.data.token;
+    const adminToken = adminResponse.body.data.accessToken;
 
     // Create test category
     const categoryData = {

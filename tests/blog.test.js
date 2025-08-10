@@ -34,7 +34,7 @@ describe('Blog Module', () => {
       .post('/api/auth/register')
       .send(userData);
 
-    authToken = userResponse.body.data.token;
+    authToken = userResponse.body.data.accessToken;
     testUserId = userResponse.body.data.user.id;
 
     // Create admin user
@@ -51,7 +51,7 @@ describe('Blog Module', () => {
       .post('/api/auth/register')
       .send(adminData);
 
-    adminToken = adminResponse.body.data.token;
+    adminToken = adminResponse.body.data.accessToken;
   });
 
   afterAll(async () => {

@@ -15,19 +15,42 @@ const { logger, auditLog } = require('../../utils/logger');
  * @returns {Object} Created category
  */
 const createCategory = async (categoryData) => {
-  const { name, slug } = categoryData;
+  const { name, slug, description, isActive = true, parentId } = categoryData;
+
+  // Auto-generate slug if not provided
+  const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
   // Check if slug already exists
   const existingCategory = await prisma.category.findFirst({
-    where: { slug, isDeleted: false }
+    where: { slug: finalSlug, isDeleted: false }
   });
 
   if (existingCategory) {
-    throw new AppError('Category slug already exists', HTTP_STATUS.CONFLICT);
+    throw new AppError('Category with this name already exists', HTTP_STATUS.CONFLICT);
   }
 
+  // Validate parent category if provided
+  if (parentId) {
+    const parentCategory = await prisma.category.findFirst({
+      where: { id: Number(parentId), isDeleted: false }
+    });
+    
+    if (!parentCategory) {
+      throw new AppError('Parent category not found', HTTP_STATUS.BAD_REQUEST);
+    }
+  }
+
+  const categoryCreateData = {
+    name,
+    slug: finalSlug,
+    isActive
+  };
+
+  if (description) categoryCreateData.description = description;
+  if (parentId) categoryCreateData.parentId = Number(parentId);
+
   const category = await prisma.category.create({
-    data: { name, slug },
+    data: categoryCreateData,
     select: {
       id: true,
       name: true,
@@ -37,7 +60,7 @@ const createCategory = async (categoryData) => {
     }
   });
 
-  auditLog('CATEGORY_CREATED', null, { categoryId: category.id, name, slug });
+  auditLog('CATEGORY_CREATED', null, { categoryId: category.id, name, slug: finalSlug });
   logger.info(`Category created: ${name}`);
 
   return category;

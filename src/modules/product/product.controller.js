@@ -16,6 +16,12 @@ const createProduct = async (req, res) => {
     const product = await productService.createProduct(req.body, req.files);
     success(res, product, 'Product created successfully', 201);
   } catch (err) {
+    if (err.message.includes('Category not found')) {
+      return error(res, err.message, 400);
+    }
+    if (err.message.includes('Validation failed')) {
+      return error(res, err.message, 400);
+    }
     error(res, err.message, 400);
   }
 };
@@ -47,6 +53,12 @@ const getProductById = async (req, res) => {
     }
     success(res, product, 'Product retrieved successfully');
   } catch (err) {
+    if (err.message.includes('Invalid product ID')) {
+      return error(res, err.message, 400);
+    }
+    if (err.message.includes('not found')) {
+      return error(res, err.message, 404);
+    }
     error(res, err.message, 400);
   }
 };
@@ -61,6 +73,15 @@ const updateProduct = async (req, res) => {
     const product = await productService.updateProduct(req.params.id, req.body, req.files);
     success(res, product, 'Product updated successfully');
   } catch (err) {
+    if (err.message.includes('Invalid product ID')) {
+      return error(res, err.message, 400);
+    }
+    if (err.message.includes('not found')) {
+      return error(res, err.message, 404);
+    }
+    if (err.message.includes('Category not found')) {
+      return error(res, err.message, 400);
+    }
     error(res, err.message, 400);
   }
 };
@@ -75,6 +96,12 @@ const deleteProduct = async (req, res) => {
     await productService.deleteProduct(req.params.id);
     success(res, null, 'Product deleted successfully');
   } catch (err) {
+    if (err.message.includes('Invalid product ID')) {
+      return error(res, err.message, 400);
+    }
+    if (err.message.includes('not found')) {
+      return error(res, err.message, 404);
+    }
     error(res, err.message, 400);
   }
 };

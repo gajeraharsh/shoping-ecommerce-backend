@@ -23,27 +23,23 @@ describe('Address Module', () => {
 
     // Create test user
     const userData = {
-      firstName: 'Address',
-      lastName: 'User',
+      name: 'Address User',
       email: 'addresstest@example.com',
-      password: 'Password123!',
-      phone: '+1234567890'
+      password: 'Password123!'
     };
 
     const userResponse = await request(app)
       .post('/api/auth/register')
       .send(userData);
 
-    authToken = userResponse.body.data.token;
+    authToken = userResponse.body.data.accessToken;
     testUserId = userResponse.body.data.user.id;
 
     // Create admin user
     const adminData = {
-      firstName: 'Address',
-      lastName: 'Admin',
+      name: 'Address Admin',
       email: 'addressadmin@example.com',
       password: 'Password123!',
-      phone: '+1234567891',
       role: 'ADMIN'
     };
 
@@ -51,7 +47,7 @@ describe('Address Module', () => {
       .post('/api/auth/register')
       .send(adminData);
 
-    adminToken = adminResponse.body.data.token;
+    adminToken = adminResponse.body.data.accessToken;
   });
 
   afterAll(async () => {

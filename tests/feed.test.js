@@ -33,7 +33,7 @@ describe('Feed Module', () => {
       .post('/api/auth/register')
       .send(userData);
 
-    authToken = userResponse.body.data.token;
+    authToken = userResponse.body.data.accessToken;
 
     // Create admin user
     const adminData = {
@@ -49,7 +49,7 @@ describe('Feed Module', () => {
       .post('/api/auth/register')
       .send(adminData);
 
-    adminToken = adminResponse.body.data.token;
+    adminToken = adminResponse.body.data.accessToken;
   });
 
   afterAll(async () => {

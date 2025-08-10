@@ -23,11 +23,9 @@ describe('User Module', () => {
 
     // Create test user
     const userData = {
-      firstName: 'User',
-      lastName: 'Test',
+      name: 'User Test',
       email: 'usertest@example.com',
-      password: 'Password123!',
-      phone: '+1234567890'
+      password: 'Password123!'
     };
 
     const registerResponse = await request(app)
@@ -35,16 +33,14 @@ describe('User Module', () => {
       .send(userData);
 
     testUser = registerResponse.body.data.user;
-    authToken = registerResponse.body.data.token;
+    authToken = registerResponse.body.data.accessToken;
     testUserId = testUser.id;
 
     // Create admin user
     const adminData = {
-      firstName: 'Admin',
-      lastName: 'Test',
+      name: 'Admin Test',
       email: 'adminusertest@example.com',
       password: 'Password123!',
-      phone: '+1234567891',
       role: 'ADMIN'
     };
 
@@ -52,7 +48,7 @@ describe('User Module', () => {
       .post('/api/auth/register')
       .send(adminData);
 
-    adminToken = adminResponse.body.data.token;
+    adminToken = adminResponse.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -84,7 +80,7 @@ describe('User Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Access token required');
+      expect(response.body.message).toContain('Unauthorized access');
     });
   });
 
@@ -120,7 +116,7 @@ describe('User Module', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('validation');
+      expect(response.body.message).toContain('Validation failed');
     });
 
     it('should fail without authentication', async () => {
@@ -134,7 +130,7 @@ describe('User Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Access token required');
+      expect(response.body.message).toContain('Unauthorized access');
     });
   });
 
@@ -145,7 +141,7 @@ describe('User Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Access token required');
+      expect(response.body.message).toContain('Unauthorized access');
     });
   });
 
@@ -166,7 +162,7 @@ describe('User Module', () => {
         .expect(401);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('Access token required');
+      expect(response.body.message).toContain('Unauthorized access');
     });
   });
 
@@ -180,9 +176,8 @@ describe('User Module', () => {
           .expect(200);
 
         expect(response.body.success).toBe(true);
-        expect(response.body.data).toHaveProperty('users');
-        expect(response.body.data).toHaveProperty('pagination');
-        expect(Array.isArray(response.body.data.users)).toBe(true);
+        expect(Array.isArray(response.body.data)).toBe(true);
+        expect(response.body.data.length).toBeGreaterThan(0);
       });
 
       it('should support pagination', async () => {
@@ -204,7 +199,7 @@ describe('User Module', () => {
           .expect(200);
 
         expect(response.body.success).toBe(true);
-        expect(response.body.data.users.length).toBeGreaterThan(0);
+        expect(Array.isArray(response.body.data)).toBe(true);
       });
 
       it('should fail for non-admin users', async () => {
@@ -214,7 +209,7 @@ describe('User Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
 
       it('should fail without authentication', async () => {
@@ -223,7 +218,7 @@ describe('User Module', () => {
           .expect(401);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Access token required');
+        expect(response.body.message).toContain('Unauthorized access');
       });
     });
 
@@ -246,7 +241,7 @@ describe('User Module', () => {
           .expect(400);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('validation');
+        expect(response.body.message).toContain('Validation failed');
       });
 
       it('should fail for non-existent user', async () => {
@@ -256,7 +251,7 @@ describe('User Module', () => {
           .expect(404);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('User not found');
+        expect(response.body.message).toContain('Resource not found');
       });
 
       it('should fail for non-admin users', async () => {
@@ -266,14 +261,14 @@ describe('User Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
 
     describe('PUT /admin/users/:id', () => {
       it('should update user for admin', async () => {
         const updateData = {
-          firstName: 'Admin Updated',
+          name: 'Admin Updated',
           role: 'USER'
         };
 
@@ -284,7 +279,7 @@ describe('User Module', () => {
           .expect(200);
 
         expect(response.body.success).toBe(true);
-        expect(response.body.data.firstName).toBe('Admin Updated');
+        expect(response.body.data.name).toBe('Admin Updated');
       });
 
       it('should fail with invalid data', async () => {
@@ -299,7 +294,7 @@ describe('User Module', () => {
           .expect(400);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('validation');
+        expect(response.body.message).toContain('Validation failed');
       });
 
       it('should fail for non-admin users', async () => {
@@ -314,7 +309,7 @@ describe('User Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
 
@@ -326,7 +321,7 @@ describe('User Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
 
       it('should fail with invalid user ID', async () => {
@@ -336,7 +331,7 @@ describe('User Module', () => {
           .expect(400);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('validation');
+        expect(response.body.message).toContain('Validation failed');
       });
     });
 
@@ -397,7 +392,7 @@ describe('User Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
   });

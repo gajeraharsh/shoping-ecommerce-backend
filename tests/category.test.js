@@ -23,8 +23,7 @@ describe('Category Module', () => {
 
     // Create test user
     const userData = {
-      firstName: 'Category',
-      lastName: 'User',
+      name: 'Category User',
       email: 'categoryuser@example.com',
       password: 'Password123!',
       phone: '+1234567890'
@@ -34,12 +33,11 @@ describe('Category Module', () => {
       .post('/api/auth/register')
       .send(userData);
 
-    authToken = userResponse.body.data.token;
+    authToken = userResponse.body.data.accessToken;
 
     // Create admin user
     const adminData = {
-      firstName: 'Category',
-      lastName: 'Admin',
+      name: 'Category Admin',
       email: 'categoryadmin@example.com',
       password: 'Password123!',
       phone: '+1234567891',
@@ -50,7 +48,7 @@ describe('Category Module', () => {
       .post('/api/auth/register')
       .send(adminData);
 
-    adminToken = adminResponse.body.data.token;
+    adminToken = adminResponse.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -149,7 +147,7 @@ describe('Category Module', () => {
           .expect(400);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('validation');
+        expect(response.body.message).toContain('Validation failed');
       });
 
       it('should fail for non-existent category', async () => {
@@ -158,7 +156,7 @@ describe('Category Module', () => {
           .expect(404);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Category not found');
+        expect(response.body.message).toContain('Resource not found');
       });
     });
 
@@ -179,7 +177,7 @@ describe('Category Module', () => {
           .expect(400);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('validation');
+        expect(response.body.message).toContain('Validation failed');
       });
     });
   });
@@ -216,7 +214,7 @@ describe('Category Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
 
       it('should fail without authentication', async () => {
@@ -225,7 +223,7 @@ describe('Category Module', () => {
           .expect(401);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Access token required');
+        expect(response.body.message).toContain('Unauthorized access');
       });
     });
 
@@ -317,7 +315,7 @@ describe('Category Module', () => {
           .expect(400);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('validation');
+        expect(response.body.message).toContain('Validation failed');
       });
 
       it('should fail for non-admin users', async () => {
@@ -333,7 +331,7 @@ describe('Category Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
 
@@ -356,7 +354,7 @@ describe('Category Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
 
@@ -392,7 +390,7 @@ describe('Category Module', () => {
           .expect(400);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('validation');
+        expect(response.body.message).toContain('Validation failed');
       });
 
       it('should fail for non-existent category', async () => {
@@ -407,7 +405,7 @@ describe('Category Module', () => {
           .expect(404);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Category not found');
+        expect(response.body.message).toContain('Resource not found');
       });
 
       it('should fail for non-admin users', async () => {
@@ -422,7 +420,7 @@ describe('Category Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
 
@@ -464,7 +462,7 @@ describe('Category Module', () => {
           .expect(404);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Category not found');
+        expect(response.body.message).toContain('Resource not found');
       });
 
       it('should fail for non-admin users', async () => {
@@ -474,7 +472,7 @@ describe('Category Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
 
@@ -496,7 +494,7 @@ describe('Category Module', () => {
           .expect(403);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.message).toContain('Admin access required');
+        expect(response.body.message).toContain('Access forbidden');
       });
     });
   });
