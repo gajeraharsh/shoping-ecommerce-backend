@@ -1,0 +1,374 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+
+  orders        Order[]
+  cart          Cart?
+  ProductRating ProductRating[]
+  Wishlist      Wishlist[]
+  Address       Address[]
+  BlogPost      BlogPost[]
+  BlogComment   BlogComment[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Address {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String
+  address   String
+  city      String
+  state     String
+  country   String
+  zipCode   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+  Order     Order[]
+  Cart      Cart[]
+
+  @@unique([userId, isDefault])
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  products  Product[]
+}
+
+model Product {
+  id              Int     @id @default(autoincrement())
+  name            String
+  sku             String? @unique
+  slug            String  @unique
+  description     String?
+  price           Float
+  discountedPrice Float?
+
+  stock           Int     @default(0)
+  tags            Json?
+  descriptionHtml String?
+  keyfeatures     Json?
+  productDetails  Json?
+  fitguide        Json?
+  styleguide      Json?
+
+  categoryId          Int
+  category            Category              @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  isDeleted           Boolean               @default(false)
+  deletedAt           DateTime?
+  orderItems          OrderItem[]
+  cartItems           CartItem[]
+  ProductRating       ProductRating[]
+  ProductVariant      ProductVariant[]
+  Wishlist            Wishlist[]
+  ProductImage        ProductImage[]
+  ProductVarientImage ProductVarientImage[]
+}
+
+model ProductVariant {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku             String? @unique
+  size            String?
+  color           String?
+  price           Float
+  discountedPrice Float?
+  stock           Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+
+  cartItems           CartItem[]
+  orderItems          OrderItem[]
+  ProductVarientImage ProductVarientImage[]
+}
+
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url      String
+  alt      String?
+  position Int?
+
+  createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+}
+
+model ProductVarientImage {
+  id        Int             @id @default(autoincrement())
+  variantId Int?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url       String
+  alt       String?
+  position  Int?
+  createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+}
+
+model ProductRating {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rating Int
+  review String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+
+  @@unique([productId, userId])
+}
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  addressId Int
+  address   Address    @relation(fields: [addressId], references: [id], onDelete: NoAction) // Keep order history safe
+
+  subtotal Float @default(0)
+  shipping Float @default(0)
+  tax      Float @default(0)
+  discount Float @default(0)
+  total    Float @default(0)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  isDeleted  Boolean   @default(false)
+  deletedAt  DateTime?
+  Discount   Discount? @relation(fields: [discountId], references: [id])
+  discountId Int?
+}
+
+model CartItem {
+  id        Int            @id @default(autoincrement())
+  cartId    Int
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int            @default(1)
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+}
+
+model Discount {
+  id             Int          @id @default(autoincrement())
+  code           String       @unique
+  description    String?
+  type           DiscountType
+  value          Float
+  startDate      DateTime?
+  endDate        DateTime?
+  usageLimit     Int?
+  usedCount      Int          @default(0)
+  minOrderAmount Float?
+  active         Boolean      @default(true)
+  isDeleted      Boolean      @default(false)
+  deletedAt      DateTime?
+
+  carts  Cart[]
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Order {
+  id                 Int                  @id @default(autoincrement())
+  userId             Int
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items              OrderItem[]
+  total              Float
+  addressId          Int
+  email              String
+  phone              String
+  address            Address              @relation(fields: [addressId], references: [id], onDelete: NoAction)
+  status             OrderStatus          @default(PENDING)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  isDeleted          Boolean              @default(false)
+  deletedAt          DateTime?
+  Discount           Discount?            @relation(fields: [discountId], references: [id])
+  discountId         Int?
+  OrderStatusHistory OrderStatusHistory[]
+}
+
+model OrderItem {
+  id        Int            @id @default(autoincrement())
+  orderId   Int
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int            @default(1)
+  price     Float
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  isDeleted Boolean        @default(false)
+  deletedAt DateTime?
+}
+
+model OrderStatusHistory {
+  id      Int   @id @default(autoincrement())
+  orderId Int
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+  isDeleted Boolean     @default(false)
+  deletedAt DateTime?
+}
+
+model Wishlist {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+
+  @@unique([userId, productId])
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model BlogPost {
+  id         Int     @id @default(autoincrement())
+  title      String
+  slug       String  @unique
+  excerpt    String?
+  content    String
+  coverImage String?
+  tags       Json?
+  authorId   Int
+  author     User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId Int
+  category   BlogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  comments    BlogComment[]
+  published   Boolean       @default(false)
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+}
+
+model BlogCategory {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  slug      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  isDeleted Boolean    @default(false)
+  deletedAt DateTime?
+  posts     BlogPost[]
+}
+
+model BlogComment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+}
+
+model InstagramReel {
+  id          Int     @id @default(autoincrement())
+  title       String
+  description String?
+  videoUrl    String
+  thumbnail   String?
+  tags        Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+}
+
+model FeedSection {
+  id          Int     @id @default(autoincrement())
+  title       String
+  description String?
+  bannerImage String?
+  linkUrl     String?
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+}
