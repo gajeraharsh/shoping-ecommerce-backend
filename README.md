@@ -59,3 +59,4 @@ npm run prisma:generate  # Generate Prisma client
 npm run prisma:migrate   # Run database migrations
 npm test             # Run tests
 ```
+# shoping-ecommerce-backend
